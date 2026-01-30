@@ -1,0 +1,20 @@
+﻿@{
+    var start = StartAt.ToLocalTime();
+    var end = EndAt.ToLocalTime();
+}
+
+<div class="d-inline-flex align-items-center gap-2 small text-secondary border border-secondary-subtle rounded px-2 py-1 bg-body-tertiary">
+
+    <span class="fw-semibold">@start.ToString("yyyy-MM-dd")</span>
+
+    <span class="text-body-emphasis fw-semibold">
+        @start.ToString("HH:mm") → @end.ToString("HH:mm")
+    </span>
+
+</div>
+
+
+@code {
+    [Parameter, EditorRequired] public DateTimeOffset StartAt { get; set; }
+    [Parameter, EditorRequired] public DateTimeOffset EndAt { get; set; }
+}

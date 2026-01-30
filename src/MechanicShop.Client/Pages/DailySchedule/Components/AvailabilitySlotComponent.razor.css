@@ -1,0 +1,82 @@
+﻿.booking-container {
+    position: relative;
+    overflow: hidden;
+    transition: 120ms ease;
+}
+
+/* Hover: subtle elevation (works on all states) */
+.slot:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 .25rem .6rem rgba(0,0,0,.08);
+}
+
+/* Typography */
+.slot-time {
+    font-size: .8rem;
+    font-weight: 600;
+    letter-spacing: .3px;
+}
+
+.slot-meta {
+    font-size: .75rem;
+    font-weight: 600;
+    opacity: .9;
+}
+
+/* Unavailable should feel constrained, not “broken” */
+.slot-unavailable {
+    opacity: .7;
+    border-style: dashed !important;
+}
+
+/* Full-slot click surface */
+.slot-cover {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .15s ease;
+}
+
+.booking-container:hover .slot-cover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.03);
+}
+
+/* Unavailable surface */
+.slot-cover--disabled {
+    cursor: not-allowed;
+}
+
+/* Busy actions (top-right) */
+.slot-actions {
+    position: absolute;
+    top: .25rem;
+    right: .25rem;
+    display: flex;
+    gap: .25rem;
+    opacity: 0;
+    transition: opacity .15s ease;
+    z-index: 20;
+}
+
+.booking-container:hover .slot-actions {
+    opacity: 1;
+}
+
+/* Buttons: soft glass look, still Bootstrap buttons */
+.slot-action-btn {
+    padding: .1rem .35rem;
+    line-height: 1.1;
+    box-shadow: 0 .125rem .25rem rgba(0,0,0,.08);
+    background: rgba(255,255,255,.85);
+    border-color: var(--bs-border-color-translucent);
+}
+
+.slot-cover,
+.slot-actions,
+.booking-overlay {
+    border-radius: 0;  /* important */
+}

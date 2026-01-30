@@ -1,0 +1,273 @@
+﻿@page "/workorders"
+@page "/workorders/Page/{Page:int}"
+
+@attribute [Authorize]
+
+<h3 class="my-4 border-start border-4 ps-3 fw-semibold text-light">
+    <i class="bi bi-calendar-plus me-2 text-secondary"></i> Work Orders
+</h3>
+
+<!-- FILTER BAR -->
+<div class="card bg-dark border-secondary-subtle mb-3">
+    <div class="card-body py-2">
+        <EditForm Model="filterRequest" OnValidSubmit="ApplyFilter">
+            <div class="row g-2 align-items-end">
+
+                <div class="col-md-3">
+                    <label class="form-label small text-secondary mb-1">Search</label>
+                    <InputText @bind-Value="filterRequest.SearchTerm" class="form-control form-control-sm" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small text-secondary mb-1">Status</label>
+                    <InputSelect @bind-Value="filterRequest.State" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        @foreach (var st in Enum.GetValues<WorkOrderState>())
+                        {
+                            <option value="@st">@st</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small text-secondary mb-1">From</label>
+                    <InputDate @bind-Value="filterRequest.StartDateFrom" class="form-control form-control-sm" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small text-secondary mb-1">To</label>
+                    <InputDate @bind-Value="filterRequest.StartDateTo" class="form-control form-control-sm" />
+                </div>
+
+                <div class="col-md-auto d-flex gap-1">
+                    <button type="submit" class="btn btn-primary btn-sm px-3">Filter</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="ResetFilter">Reset</button>
+                </div>
+
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@if (pagedResult?.Items == null)
+{
+    <p class="text-secondary">Loading...</p>
+}
+else if (!pagedResult.Items.Any())
+{
+    <p class="text-secondary">No work orders found.</p>
+}
+else
+{
+    <div class="container-fluid">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle text-nowrap small">
+
+               <thead class="text-secondary text-uppercase small border-bottom border-secondary-subtle">
+                    <tr>
+                        <th style="width: 26%" @onclick="() => SortBy(nameof(WorkOrderListItemModel.Vehicle))">
+                            Vehicle <i class="bi @GetSortIcon(nameof(WorkOrderListItemModel.Vehicle))"></i>
+                        </th>
+                        <th style="width: 12%" @onclick="() => SortBy(nameof(WorkOrderListItemModel.Customer))">
+                            Customer <i class="bi @GetSortIcon(nameof(WorkOrderListItemModel.Customer))"></i>
+                        </th>
+                        <th class="text-center" style="width: 6%">Spot</th>
+                        <th class="text-center" style="width: 10%">Labor</th>
+                        <th style="width: 20%">Repair Tasks</th>
+                        <th class="text-center" style="width: 10%" @onclick="() => SortBy(nameof(WorkOrderListItemModel.State))">
+                            Status <i class="bi @GetSortIcon(nameof(WorkOrderListItemModel.State))"></i>
+                        </th>
+                        <th class="text-end" style="width: 10%" @onclick="() => SortBy(nameof(WorkOrderListItemModel.StartAtUtc))">
+                            Time Slot <i class="bi @GetSortIcon(nameof(WorkOrderListItemModel.StartAtUtc))"></i>
+                        </th>
+                        <th class="text-end" style="width: 6%">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var wo in pagedResult.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">
+                                @wo.Vehicle.Make @wo.Vehicle.Model
+                                <span class="text-secondary small">@wo.Vehicle.Year</span>
+                                <span class="text-secondary ms-1">| @wo.Vehicle.LicensePlate</span>
+                            </td>
+
+                            <td>@wo.Customer</td>
+
+                            <td class="text-center text-secondary">@wo.Spot</td>
+                            <td class="text-center text-secondary">@wo.Labor</td>
+
+                            <td class="text-wrap">
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach (var task in wo.RepairTasks.Take(2))
+                                    {
+                                        <span class="badge bg-body-secondary text-body">@task</span>
+                                    }
+
+                                    @if (wo.RepairTasks.Count > 2)
+                                    {
+                                        <span class="badge bg-secondary-subtle text-secondary">
+                                            +@((wo.RepairTasks.Count - 2))
+                                        </span>
+                                    }
+                                </div>
+                            </td>
+
+                            <td class="text-center fw-semibold @GetStatusTextClass(wo.State)">
+                                @GetStatusIcon(wo.State) @wo.State
+                            </td>
+
+                            <td class="text-end text-secondary fw-semibold">
+                                <TimeSlotDisplayComponent StartAt="wo.StartAtUtc" EndAt="wo.EndAtUtc" />
+                            </td>
+
+                            <td class="text-end">
+                                 <div class="btn-group btn-group-sm">
+                                        <a class="btn btn-outline-secondary" href="/workorder-details/@wo.WorkOrderId"
+                                            title="Details">
+                                            <i class="bi bi-info"></i>
+                                        </a>
+                                        <AuthorizeView Roles="Manager">
+                                            <Authorized>
+                                                @if (wo.State == WorkOrderState.Completed)
+                                                {
+                                                    if (wo.InvoiceId.HasValue)
+                                                    {
+                                                        <a class="btn btn-sm btn-outline-secondary" href="/invoice/@wo.InvoiceId"
+                                                            title="View Invoice">
+                                                            <i class="bi bi-file-earmark-text"></i>
+                                                        </a>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button class="btn btn-sm btn-primary"
+                                                            @onclick="() => CreateInvoice(wo.WorkOrderId)" title="Create Invoice">
+                                                            <i class="bi bi-plus-circle"></i>
+                                                        </button>
+                                                    }
+                                                }
+                                            </Authorized>
+                                        </AuthorizeView>
+                                    </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-3">
+            <Paginator TotalItems="pagedResult.TotalCount"
+                       ItemsPerPage="pagedResult.PageSize"
+                       CurrentPageNumber="pagedResult.PageNumber"
+                       NavUrl="workorders/page/" />
+        </div>
+    </div>
+}
+
+@code {
+    [Inject] private ServiceApi serviceApi { get; set; } = default!;
+    [Inject] private NavigationManager navigationManager { get; set; } = default!;
+    [Inject] private IAccountManagement accountManagement { get; set; } = default!;
+
+    [Parameter] public int Page { get; set; }
+
+    private WorkOrderFilterRequest filterRequest = new WorkOrderFilterRequest();
+    private PageRequest pageRequest = new PageRequest { Page = 1, PageSize = 10 };
+    private PaginatedList<WorkOrderListItemModel>? pagedResult;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await accountManagement.CheckAuthenticatedAsync())
+            navigationManager.NavigateTo("/login");
+
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        pageRequest = new PageRequest
+        {
+            Page = Page <= 0 ? 1 : Page,
+            PageSize = 10
+        };
+
+        await LoadWorkOrders();
+    }
+
+    private async Task LoadWorkOrders()
+    {
+        var pagedResponseResult = await serviceApi.GetWorkOrdersAsync(filterRequest, pageRequest);
+
+        if (pagedResponseResult.IsSuccess)
+        {
+            pagedResult = pagedResponseResult.Data;
+        }
+    }
+
+    private async Task ApplyFilter()
+    {
+        pageRequest.Page = 1;
+        await LoadWorkOrders();
+    }
+
+    private async Task ResetFilter()
+    {
+        filterRequest = new WorkOrderFilterRequest();
+        pageRequest.Page = 1;
+        await LoadWorkOrders();
+    }
+
+    private async Task SortBy(string column)
+    {
+        if (filterRequest.SortColumn.Equals(column, StringComparison.OrdinalIgnoreCase))
+        {
+            filterRequest.SortDirection = filterRequest.SortDirection.Equals("asc", StringComparison.OrdinalIgnoreCase) ? "desc" :
+            "asc";
+        }
+        else
+        {
+            filterRequest.SortColumn = column;
+            filterRequest.SortDirection = "desc";
+        }
+        await LoadWorkOrders();
+    }
+
+    private async Task CreateInvoice(Guid workOrderId)
+    {
+        var createInvoiceResult = await serviceApi.IssueInvoiceAsync(workOrderId);
+
+        if (createInvoiceResult.IsSuccess)
+        {
+            navigationManager.NavigateTo($"/invoice/{createInvoiceResult.Data!.InvoiceId}");
+        }
+        else
+        {
+
+        }
+    }
+
+    private string GetSortIcon(string column)
+    => filterRequest.SortColumn.Equals(column, StringComparison.OrdinalIgnoreCase)
+    ? (filterRequest.SortDirection.Equals("asc", StringComparison.OrdinalIgnoreCase) ? "bi-arrow-up" : "bi-arrow-down")
+    : string.Empty;
+
+    private string GetStatusTextClass(WorkOrderState state) => state switch
+    {
+        WorkOrderState.Completed => "text-success-emphasis",
+        WorkOrderState.InProgress => "text-info-emphasis",
+        WorkOrderState.Scheduled => "text-warning-emphasis",
+        WorkOrderState.Cancelled => "text-danger-emphasis",
+        _ => "text-secondary"
+    };
+
+    private MarkupString GetStatusIcon(WorkOrderState state) => state switch
+    {
+        WorkOrderState.Completed => new("<i class='bi bi-check-circle me-1'></i>"),
+        WorkOrderState.InProgress => new("<i class='bi bi-tools me-1'></i>"),
+        WorkOrderState.Scheduled => new("<i class='bi bi-hourglass-split me-1'></i>"),
+        WorkOrderState.Cancelled => new("<i class='bi bi-x-circle me-1'></i>"),
+        _ => new("")
+    };
+}
