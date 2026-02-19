@@ -1,0 +1,43 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace MechanicShop.Domain.Common
+{
+    public class Entity
+    {
+         public Guid Id { get; }
+
+    private readonly List<DomainEvent> _domainEvents = [];
+
+    [NotMapped]
+    public IReadOnlyCollection<DomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+
+    protected Entity()
+    { }
+
+    protected Entity(Guid id)
+    {
+        Id = id == Guid.Empty ? Guid.NewGuid() : id;
+    }
+
+    public void AddDomainEvent(DomainEvent domainEvent)
+    {
+        _domainEvents.Add(domainEvent);
+    }
+
+    public void RemoveDomainEvent(DomainEvent domainEvent)
+    {
+        _domainEvents.Remove(domainEvent);
+    }
+
+    public void ClearDomainEvents()
+    {
+        _domainEvents.Clear();
+    }
+    }
+
+ 
+}
