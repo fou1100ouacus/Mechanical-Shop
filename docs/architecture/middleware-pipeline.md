@@ -75,7 +75,7 @@ flowchart TD
 
 On the inbound path, requests pass through the explicitly registered middleware order. Endpoint routing selects a candidate endpoint and makes its metadata available to authorization and other endpoint-aware middleware. A middleware can short-circuit: HTTPS redirection may return a redirect; CORS preflight can complete before endpoint execution; rate limiting may reject; authorization may return a challenge or forbid response. If an endpoint runs, it creates the response. The response then unwinds through middleware that entered for the request. The exception handler can translate unhandled downstream exceptions, and status-code pages can add a body to otherwise empty error responses.
 
-The framework adds endpoint routing for this `WebApplication`; the diagram distinguishes route selection from the explicit middleware calls. MVC action execution and MVC conventions are detailed in [filters-applied.md](filters-applied.md).
+The framework adds endpoint routing for this `WebApplication`; the diagram distinguishes route selection from the explicit middleware calls. MVC action execution and MVC conventions are detailed in [Filter.md](Filter.md).
 
 ## Middleware branches and endpoint-specific behavior
 
@@ -84,7 +84,7 @@ The framework adds endpoint routing for this `WebApplication`; the diagram disti
 - **CORS:** the configured policy allows configured origins, any headers and methods, and credentials. Preflight handling may complete a request early.
 - **Rate limiting:** `AddAppRateLimiting` defines named policy `SlidingWindow`; `UseRateLimiter` is in the shared chain. The named policy definition alone does not establish that every route selects it.
 - **Authorization:** controller attributes provide policy/role metadata consumed by `UseAuthorization()`. `MapRazorComponents<App>().AllowAnonymous()` explicitly marks the Razor endpoint anonymous.
-- **Output cache:** explicitly attributed actions are listed with their MVC behavior in [filters-applied.md](filters-applied.md).
+- **Output cache:** explicitly attributed actions are listed with their MVC behavior in [Filter.md](Filter.md).
 - **Error handling:** action helpers may return Problem Details without throwing; unhandled exceptions go to `GlobalExceptionHandler`.
 - **Endpoint mapping:** `Program.cs` maps MVC controllers, Razor Components, static assets, and SignalR. The source tree also contains minimal API endpoint mapping classes, but startup does not call their mapping extensions; they are not included as active mapped routes here.
 
@@ -92,4 +92,4 @@ The framework adds endpoint routing for this `WebApplication`; the diagram disti
 
 `RequestLogContextMiddleware` exists under `Api/Infrastructure`, but no `UseMiddleware<RequestLogContextMiddleware>()` call appears in the inspected startup/registration. It is therefore not part of the observed chain.
 
-See [filters-applied.md](filters-applied.md) for the MVC conventions, authorization metadata, output-cache attributes, and filter inventory.
+See [Filter.md](Filter.md) for the MVC conventions, authorization metadata, output-cache attributes, and filter inventory.
