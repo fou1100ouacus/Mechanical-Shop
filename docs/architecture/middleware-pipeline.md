@@ -1,6 +1,6 @@
 # Middleware and request pipeline
 
-Primary source: [`src/MechanicShop.Api/Program.cs`](../../src/MechanicShop.Api/Program.cs) and [`src/MechanicShop.Api/DependencyInjection.cs`](../../src/MechanicShop.Api/DependencyInjection.cs). This describes the pipeline as wired in source; no runtime trace was collected.
+Primary source: [API startup](../../src/MechanicShop.Api/Program.cs) and [presentation registration](../../src/MechanicShop.Api/DependencyInjection.cs). This describes the pipeline as wired in source; no runtime trace was collected.
 
 ## Environment branching at startup
 
@@ -19,77 +19,77 @@ flowchart TD
 
 ### Diagram explanation
 
-The branch is evaluated once while the host is built, not independently for each request. Development maps API documentation, initializes the database via `InitialiseDatabaseAsync()`, and enables WebAssembly debugging. The `else` branch applies HSTS. Both branches then enter the same `UseCoreMiddlewares` chain and map the application endpoints. Therefore the source does not show database initialization occurring in Production startup. OpenAPI/Swagger/Scalar setup and WebAssembly debugging are Development-only; HSTS is Production-only in this branch.
+The environment branch is evaluated once while the host is built, not independently for each request. Development maps API documentation, initializes the database via `InitialiseDatabaseAsync()`, and enables WebAssembly debugging. The `else` branch applies HSTS. Both branches then enter the same `UseCoreMiddlewares` chain and map application endpoints. The source does not show database initialization in non-Development startup.
 
 ## Explicit middleware order
 
-`Program.cs` calls `UseCoreMiddlewares` before mapping endpoints. Within that extension, the order is:
+`Program.cs` calls `UseCoreMiddlewares` before mapping endpoints. The extension in `DependencyInjection.cs` adds these middleware in this order:
 
-1. `UseExceptionHandler()` — uses the registered `GlobalExceptionHandler` to turn unhandled downstream exceptions into the configured error response.
+1. `UseExceptionHandler()` — the registered `GlobalExceptionHandler` formats unhandled downstream exceptions.
 2. `UseStatusCodePages()` — supplies a body for otherwise empty error status responses.
-3. `UseHttpsRedirection()` — redirects HTTP requests to HTTPS where configured.
-4. `UseSerilogRequestLogging()` — records request/response information for requests that reach it.
-5. `UseCors(configuredPolicy)` — applies the named policy from `AppSettings:CorsPolicyName`.
-6. `UseRateLimiter()` — activates the configured rate-limiting middleware; the registration defines a named sliding-window limiter with 100 permits/minute, six segments, and queue limit 10.
-7. `UseAuthentication()` — establishes the principal using the configured JWT bearer scheme.
+3. `UseHttpsRedirection()` — may redirect HTTP requests to HTTPS.
+4. `UseSerilogRequestLogging()` — logs requests that reach it.
+5. `UseCors(configuredPolicy)` — applies the policy named by `AppSettings:CorsPolicyName`.
+6. `UseRateLimiter()` — activates rate-limiting middleware. Registration defines a named sliding-window limiter with 100 permits/minute, six segments, and queue limit 10.
+7. `UseAuthentication()` — establishes the request principal using the configured authentication scheme.
 8. `UseAuthorization()` — enforces endpoint authorization metadata and policies.
-9. `UseOutputCache()` — enables ASP.NET Core output-cache processing for endpoints that participate in it.
+9. `UseOutputCache()` — enables output caching for participating endpoints.
 
-After the shared chain, `Program.cs` calls/declares `MapControllers()`, `UseAntiforgery()`, `MapStaticAssets()`, `MapRazorComponents<App>()` with Interactive WebAssembly rendering and the Client assembly, and `MapHub<WorkOrderHub>("/hubs/workorders")`, then `Run()`.
+After the shared chain, `Program.cs` maps controllers, applies antiforgery middleware, maps static assets, maps Razor Components with Interactive WebAssembly rendering, and maps the SignalR hub at `/hubs/workorders`.
 
-ASP.NET Core `WebApplication` supplies endpoint routing for the mapped endpoints; there is no explicit `UseRouting()` call in the source. The `Map...` calls register endpoints and are not ordinary middleware that execute in the textual order as a linear chain. The effective endpoint is selected by routing and then its endpoint metadata is available to authorization and other endpoint-aware middleware.
+There is no explicit `UseRouting()` call. `WebApplication` supplies endpoint routing for mapped endpoints. The `Map...` calls register endpoints; their textual order is not a linear series of endpoint executions.
 
 ## Request and response flow
 
 ```mermaid
 flowchart TD
-  Req[Incoming HTTP request] --> Routing[Framework endpoint routing]
-  Routing --> EH[Exception handler]
+  Req[Incoming HTTP request] --> EH[Exception handler]
   EH --> SCP[Status code pages]
   SCP --> HTTPS[HTTPS redirection]
   HTTPS --> Log[Serilog request logging]
   Log --> CORS[CORS policy]
   CORS --> RL[Rate limiter]
-  RL --> AuthN[JWT authentication]
-  AuthN --> AuthZ[Authorization / endpoint policy]
+  RL --> AuthN[Authentication]
+  AuthN --> AuthZ[Authorization]
   AuthZ --> Cache[Output cache middleware]
-  Cache --> Endpoint{Selected endpoint}
-  Endpoint --> Controller[MVC controller]
+  Cache --> Routing[Framework endpoint routing]
+  Routing --> Endpoint{Selected endpoint}
+  Endpoint --> MVC[Controller action and MVC execution]
   Endpoint --> Hub[SignalR hub]
   Endpoint --> UI[Razor Components / static assets]
-  Controller --> Response[Endpoint creates response]
+  MVC --> Response[Endpoint produces response]
   Hub --> Response
   UI --> Response
-  Response --> CacheOut[Output cache middleware unwinds]
+  Response --> CacheOut[Output cache unwinds]
   CacheOut --> AuthZOut[Authorization unwinds]
   AuthZOut --> AuthNOut[Authentication unwinds]
   AuthNOut --> RLOut[Rate limiter unwinds]
-  RLOut --> CORSOut[CORS adds response headers if applicable]
+  RLOut --> CORSOut[CORS response handling]
   CORSOut --> LogOut[Serilog completes request event]
-  LogOut --> EHOut[Exception handler passes response]
-  EHOut --> Client[Response returned to caller]
+  LogOut --> SCPOut[Status code pages may complete body]
+  SCPOut --> EHOut[Exception handler returns response]
+  EHOut --> Client[Response to caller]
 ```
 
 ### Diagram explanation
 
-On the inbound path, routing identifies a candidate endpoint. The exception handler surrounds the downstream chain so it can handle exceptions from later middleware or endpoint execution. Status-code pages can add a response body when later work returns an otherwise empty error status. HTTPS redirection may short-circuit an HTTP request with a redirect. Requests that continue pass through logging, CORS, rate limiting, authentication, authorization, and output caching before endpoint execution.
+On the inbound path, requests pass through the explicitly registered middleware order. Endpoint routing selects a candidate endpoint and makes its metadata available to authorization and other endpoint-aware middleware. A middleware can short-circuit: HTTPS redirection may return a redirect; CORS preflight can complete before endpoint execution; rate limiting may reject; authorization may return a challenge or forbid response. If an endpoint runs, it creates the response. The response then unwinds through middleware that entered for the request. The exception handler can translate unhandled downstream exceptions, and status-code pages can add a body to otherwise empty error responses.
 
-On the outbound path, the selected endpoint first creates the response. The response then unwinds through the middleware that ran for that request. CORS can add its response headers, Serilog finishes its request event, and the exception handler returns normally unless it handled an exception. If a middleware short-circuits the request, later middleware and the endpoint do not run; the response unwinds only through middleware that already entered.
+The framework adds endpoint routing for this `WebApplication`; the diagram distinguishes route selection from the explicit middleware calls. MVC action execution and MVC conventions are detailed in [filters-applied.md](filters-applied.md).
 
-The routing box is shown first because endpoint-aware middleware needs route metadata. `WebApplication` adds routing around the configured pipeline when endpoints are mapped; it is implicit rather than an explicit `UseRouting()` statement in `Program.cs`.
+## Middleware branches and endpoint-specific behavior
 
-## Request branches and endpoint-specific behavior
+- **Environment:** Development maps OpenAPI/Swagger/Scalar, initializes the database, and enables WebAssembly debugging. Non-Development applies HSTS. Both use the shared middleware chain.
+- **HTTPS:** `UseHttpsRedirection` can return a redirect before endpoint execution.
+- **CORS:** the configured policy allows configured origins, any headers and methods, and credentials. Preflight handling may complete a request early.
+- **Rate limiting:** `AddAppRateLimiting` defines named policy `SlidingWindow`; `UseRateLimiter` is in the shared chain. The named policy definition alone does not establish that every route selects it.
+- **Authorization:** controller attributes provide policy/role metadata consumed by `UseAuthorization()`. `MapRazorComponents<App>().AllowAnonymous()` explicitly marks the Razor endpoint anonymous.
+- **Output cache:** explicitly attributed actions are listed with their MVC behavior in [filters-applied.md](filters-applied.md).
+- **Error handling:** action helpers may return Problem Details without throwing; unhandled exceptions go to `GlobalExceptionHandler`.
+- **Endpoint mapping:** `Program.cs` maps MVC controllers, Razor Components, static assets, and SignalR. The source tree also contains minimal API endpoint mapping classes, but startup does not call their mapping extensions; they are not included as active mapped routes here.
 
-- **Environment branch:** Development and non-Development host setup differ as shown above. The shared chain is used in both branches.
-- **HTTPS redirect:** `UseHttpsRedirection` can end an insecure request with a redirect before controller execution.
-- **CORS:** the named policy permits configured origins, any headers/methods, and credentials. CORS preflight handling can complete a request before endpoint execution.
-- **Rate limiting:** `AddAppRateLimiting` defines a named policy `SlidingWindow` and `UseRateLimiter` is in the shared chain. A named policy’s existence alone does not prove that every route selects it; route-specific application is governed by endpoint metadata, so the documentation does not claim universal enforcement.
-- **Authentication and authorization:** controllers can carry `[Authorize]` and role/policy metadata; the controller set includes protected work-order routes. The static endpoint definitions also declare `.RequireAuthorization()`, but the startup path does not call their mapping extensions. `MapRazorComponents<App>().AllowAnonymous()` explicitly allows the UI endpoint.
-- **Error handling:** errors mapped by application result helpers can return Problem Details without throwing; unhandled exceptions flow to `GlobalExceptionHandler`. `UseStatusCodePages` concerns error responses whose body is otherwise absent.
-- **Static assets, Razor UI, MVC, and SignalR:** requests are dispatched to their respective endpoint types after the shared pipeline. The hub route is `/hubs/workorders`.
+## Classes present but not wired into the observed chain
 
-## Source items present but not wired into this chain
+`RequestLogContextMiddleware` exists under `Api/Infrastructure`, but no `UseMiddleware<RequestLogContextMiddleware>()` call appears in the inspected startup/registration. It is therefore not part of the observed chain.
 
-`RequestLogContextMiddleware` exists under `Api/Infrastructure`, but there is no `UseMiddleware<RequestLogContextMiddleware>()` call in `Program.cs` or `UseCoreMiddlewares`. It is therefore not part of the observed middleware pipeline. Likewise, `Api/Endpoints/*.cs` defines minimal API mapping extension methods, but a repository-wide source inspection found no call to those mapping methods from startup. The active route mapping visibly uses `MapControllers()`.
-
-Source references: [`Api/Program.cs`](../../src/MechanicShop.Api/Program.cs), [`Api/DependencyInjection.cs`](../../src/MechanicShop.Api/DependencyInjection.cs), [`Api/Infrastructure/GlobalExceptionHandler.cs`](../../src/MechanicShop.Api/Infrastructure/GlobalExceptionHandler.cs), [`Api/Infrastructure/RequestLogContextMiddleware.cs`](../../src/MechanicShop.Api/Infrastructure/RequestLogContextMiddleware.cs), and [`Api/Controllers`](../../src/MechanicShop.Api/Controllers).
+See [filters-applied.md](filters-applied.md) for the MVC conventions, authorization metadata, output-cache attributes, and filter inventory.
