@@ -45,6 +45,18 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseHsts();
+
+    // Demo data seeding is disabled in production unless explicitly enabled.
+    if (builder.Configuration.GetValue<bool>("Database:SeedDemoData"))
+    {
+        if (string.IsNullOrWhiteSpace(builder.Configuration["Database:InitialUserPassword"]))
+        {
+            throw new InvalidOperationException(
+                "Database:InitialUserPassword must be configured before production demo data seeding.");
+        }
+
+        await app.InitialiseDatabaseAsync();
+    }
 }
 
 app.UseCoreMiddlewares(builder.Configuration);
