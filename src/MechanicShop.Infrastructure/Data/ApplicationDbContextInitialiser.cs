@@ -11,6 +11,7 @@ using MechanicShop.Infrastructure.Identity;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -19,9 +20,11 @@ namespace MechanicShop.Infrastructure.Data;
 public class ApplicationDbContextInitialiser(
     ILogger<ApplicationDbContextInitialiser> logger,
     AppDbContext context, UserManager<AppUser> userManager,
-    RoleManager<IdentityRole> roleManager)
+    RoleManager<IdentityRole> roleManager,
+    IConfiguration configuration)
 {
     private readonly ILogger<ApplicationDbContextInitialiser> _logger = logger;
+    private readonly string? _initialUserPassword = configuration["Database:InitialUserPassword"];
     private readonly AppDbContext _context = context;
     private readonly UserManager<AppUser> _userManager = userManager;
     private readonly RoleManager<IdentityRole> _roleManager = roleManager;
@@ -80,7 +83,7 @@ public class ApplicationDbContextInitialiser(
 
         if (_userManager.Users.All(u => u.Email != manager.Email))
         {
-            await _userManager.CreateAsync(manager, manager.Email);
+            await _userManager.CreateAsync(manager, _initialUserPassword ?? manager.Email!);
 
             if (!string.IsNullOrWhiteSpace(managerRole.Name))
             {
@@ -98,7 +101,7 @@ public class ApplicationDbContextInitialiser(
 
         if (_userManager.Users.All(u => u.Email != labor01.Email))
         {
-            await _userManager.CreateAsync(labor01, labor01.Email);
+            await _userManager.CreateAsync(labor01, _initialUserPassword ?? labor01.Email!);
 
             if (!string.IsNullOrWhiteSpace(laborRole.Name))
             {
@@ -116,7 +119,7 @@ public class ApplicationDbContextInitialiser(
 
         if (_userManager.Users.All(u => u.Email != labor02.Email))
         {
-            await _userManager.CreateAsync(labor02, labor02.Email);
+            await _userManager.CreateAsync(labor02, _initialUserPassword ?? labor02.Email!);
 
             if (!string.IsNullOrWhiteSpace(laborRole.Name))
             {
@@ -134,7 +137,7 @@ public class ApplicationDbContextInitialiser(
 
         if (_userManager.Users.All(u => u.Email != labor03.Email))
         {
-            await _userManager.CreateAsync(labor03, labor03.Email);
+            await _userManager.CreateAsync(labor03, _initialUserPassword ?? labor03.Email!);
 
             if (!string.IsNullOrWhiteSpace(laborRole.Name))
             {
@@ -152,7 +155,7 @@ public class ApplicationDbContextInitialiser(
 
         if (_userManager.Users.All(u => u.Email != labor04.Email))
         {
-            await _userManager.CreateAsync(labor04, labor04.Email);
+            await _userManager.CreateAsync(labor04, _initialUserPassword ?? labor04.Email!);
 
             if (!string.IsNullOrWhiteSpace(laborRole.Name))
             {
