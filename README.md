@@ -9,7 +9,7 @@ Welcome to the **MechanicShop System**! This project is a modern web application
 
 | Role    | Email          | Password |
 |---------|----------------|----------|
-| Manager | pm@localhost   |pm@localhost 
+| Manager | pm@localhost   |Database__InitialUserPassword 
 
 > Use **`pm@localhost`** to log in as a Manager and explore the full system features.
 
