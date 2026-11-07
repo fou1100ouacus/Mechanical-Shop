@@ -4,7 +4,16 @@ Welcome to the **MechanicShop System**! This project is a modern web application
 
 # Demo :
 ### https://drive.google.com/drive/folders/1ZucFrs5UYB3Rbrj4wAJ3b-SAyUF-rC4g?usp=sharing
-## ✨ Features
+
+## 🔐 Test Credentials
+
+| Role    | Email          | Password |
+|---------|----------------|----------|
+| Manager | pm@localhost   |pm@localhost 
+
+> Use **`pm@localhost`** to log in as a Manager and explore the full system features.
+
+# ✨ Features
 
 - **Comprehensive Workshop Management** — Manage work orders, customer data, and repair tasks efficiently.
 - **Modern Web Interface** — A responsive and interactive frontend for a seamless user experience.
