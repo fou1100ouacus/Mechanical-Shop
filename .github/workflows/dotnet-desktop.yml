@@ -1,13 +1,18 @@
-name: .NET
+name: Build, test and deploy to MonsterASP.NET
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    name: Build and test
     runs-on: ubuntu-latest
 
     steps:
@@ -33,3 +38,48 @@ jobs:
             dotnet test $project.FullName --configuration Release
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+
+  deploy:
+    name: Publish to MonsterASP.NET
+    needs: build
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish for Windows x64
+        run: dotnet publish src/MechanicShop.Api/MechanicShop.Api.csproj --configuration Release --runtime win-x64 --self-contained false --output ./publish
+
+      - name: Check Web Deploy secrets
+        id: deploy-config
+        shell: pwsh
+        env:
+          WEBSITE_NAME: ${{ secrets.WEBSITE_NAME }}
+          SERVER_COMPUTER_NAME: ${{ secrets.SERVER_COMPUTER_NAME }}
+          SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
+          SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+        run: |
+          $required = @('WEBSITE_NAME', 'SERVER_COMPUTER_NAME', 'SERVER_USERNAME', 'SERVER_PASSWORD')
+          $missing = @($required | Where-Object { [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_)) })
+          if ($missing.Count -gt 0) {
+            "configured=false" >> $env:GITHUB_OUTPUT
+            Write-Host "Web Deploy secrets are not set yet; skipping deployment."
+          } else {
+            "configured=true" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Deploy to MonsterASP.NET via Web Deploy
+        if: steps.deploy-config.outputs.configured == 'true'
+        uses: rasmusbuchholdt/simply-web-deploy@2.1.0
+        with:
+          website-name: ${{ secrets.WEBSITE_NAME }}
+          server-computer-name: ${{ secrets.SERVER_COMPUTER_NAME }}
+          server-username: ${{ secrets.SERVER_USERNAME }}
+          server-password: ${{ secrets.SERVER_PASSWORD }}
