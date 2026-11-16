@@ -11,6 +11,9 @@
 **Demo video:** [Open the demo folder](https://drive.google.com/drive/folders/1ZucFrs5UYB3Rbrj4wAJ3b-SAyUF-rC4g?usp=sharing)
 
 ---
+| Role    | Email          | Password |
+|---------|----------------|----------|
+| Manager | pm@localhost   |Database__InitialUserPassword 
 
 ## Table of Contents
 
